@@ -1,0 +1,164 @@
+;***********************************************************
+;     Mode 3: Air conditioning Application
+;     variables: mode, val in A/D converter, red button/control value,
+;     port: transistor, potentiometer,solenoid, LED in PortD, red button, octal switch, register
+;     include an interrupt to sense a fault
+;     PSEUDOCODE
+;     1. Read the value on the control pot
+;     2. Press the red button (portC, 6) again, the control becomes active
+;     3. If the value on the A/D converter is greater than 70 hex, the solenoid engages
+;     4. A/D is read continuously. When greater than 70, solenoid engages; less than 70 retracts
+;     5. Press the red button again to stop the control
+;     6. When control is active, indicator flashes
+;     7. With control inactive, press the green button (portc, 7) to switch to a new mode
+;     8. If reading of A/D converter is 0, fault is indicated
+;     
+;***********************************************************
+
+      #include <P16F737.INC>
+
+;     Variable declarations
+
+      Control   equ     20h     ; value for red button (control active or inactive)
+      Setter    equ     21h     ; value on the control potentiometer
+      State     equ     22h     ; the program state register
+      Green     equ     18h     ; the mode switching button     
+      Temp      equ     16h     ; temporary   
+      Mod       equ     14h     ; the mode  
+
+                org     00h          ; interrupt vector
+                goto    SwitchCheck  ; goto interrupt service routine
+
+                org     04h          ; interrupt vector
+                goto    SensorFault  ; goto indicate fault routine
+
+                org     15h          ; beginning of program storage
+
+SwitchCheck
+           call initPort        ; initialize ports
+
+;
+; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+;
+
+;     Mode 3
+
+Set
+      clrf     Control          ; set the control to inactive (0)
+      movwf    PORTD, 2         ; turn off LED
+      
+      movlw    D'3'             ; load Mod with decimal 3 (set Mode = 3)
+      movwf    Mod
+
+waitPress3
+      btfss    PORTC, 7         ; see if green button pressed
+      goto     GreenPress       ; green button is pressed - goto routine
+      btfss    PORTC, 6         ; see if red button pressed
+      goto     RedPress3        ; red button is pressed - goto routine
+      goto     Main
+
+Main
+      cmp      Control, 1       ; check if active
+      je       ValueChange
+      goto     waitPress3
+
+ValueChange
+      goto     AtoD             ; read control potentiometer value
+      cmp      Setter, 0        ; check for fault
+      je       SensorFault            ; sense a fault [ STILL NEED TO WRITE FAULT ]
+      cmp      Setter, 70       ; check if pot val > 70 hex
+      jl       TransOff         ; go to RedPress if  val < 70
+      movwf    Transistor       ; turn on main transistor
+      goto     RedPress3
+
+SensorFault
+
+TransOff
+      movwf    Transistor       ; turn off the main transistor
+      return
+
+
+
+AtoD
+      call     initAD           ; call to initialize A/D
+      call     setupDelay       ; delay for Tad
+      bsf      ADCON0, GO       ; start A/D conversion
+;
+; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+; Wait loop
+
+waitLoop
+      btsfc     ADCON0, GO     ; check if A/D is finished
+      goto      waitLoop       ; loop here until A/D finished
+
+;     Get value of A/D
+
+      btsfc     ADCON0, GO     ; make sure A/D finished
+      goto      waitLoop       ; A/D not finished, continue to loop
+      movf      ADRESH, W      ; get A/D value
+      movwf     Setter         ; store A/D value in Setter
+      bsf       ADCON0, GO     ; restart A/D conversion
+      goto      waitLoop       ; return to loop
+
+
+RedPress3
+      btfss    PORTC, 6         ; see if red button pressed
+      return                    ; noise - not pressed - keep checking
+
+     
+RedRelease3 ; could get rid of this
+      btfss    PORTC, 6         ; see if red button released
+      goto     RedRelease3      ; no - keep waiting
+      
+      goto     ControlEngage    ; increment the control value
+     
+      
+ControlEngage
+      incf     Control, F       ; icrement count - store in F register
+      cmp      Control, 1       ; Compare control to 1
+      jl       Less
+      movlw    D'0'             ; set control to inactive
+      movwf    Control
+      movwf    PORTD, 2         ; turn off green LED
+      jmp      Both
+      goto     waitPress        ; return to the main loop to monitor for pot change
+      return
+Less
+      movlw    D'1'             ; set control to active
+      movwf    PORTD, 2         ; turn on green LED
+Both
+      return 
+
+
+
+
+
+
+
+
+
+
+
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;
+;  InitializeAD - initializes and sets up the A/D hardware.
+;  Select AN0 to AN3 as analog inputs, proper clock period, and read AN0.
+initAD
+     bsf     STATUS,RP0      ; select register bank 1
+     movlw   B'00001110'     ; RA0 analog input, all other digital
+     movwf   ADCON1          ; move to special function A/D register
+     bcf     STATUS,RP0      ; select register bank 0
+     movlw   B'01000001'     ; select 8 * oscillator, analog input 0, turn on
+     movwf   ADCON0         ; move to special function A/D register
+     return
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+; 
+;  This routine is a software delay of 10uS required for the A/D setup.
+;  At a 4Mhz clock, the loop takes 3uS, so initialize the register Temp with
+;  a value of 3 to give 9uS, plus the move etc. should result in
+;  a total time of > 10uS.
+
+SetupDelay 
+     movlw   03h              ; load Temp with hex 3
+     movwf   Temp
