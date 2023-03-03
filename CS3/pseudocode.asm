@@ -18,6 +18,20 @@
 
 
 ; ** mode 1
+; check for green press
+    ; if yes, go to GreenPress state
+    ; if no check for red press (solenoid engaged)
+        ; if no check for green press
+        ; if yes check for red release (solenoid disengaged)
+            ; if no check for red release
+            ; if yes read value on potentiometer           
+                ; if value = 0, error LED light up
+                ; if value > 0 turn on main transistor
+                ; check for red press
+                    ; if yes check for red release 
+                    ; if no check time
+                        ; if time is done turn off main transistor
+                        ; if time isn't done check for red press
 
 ; ** mode 2
 
