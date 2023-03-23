@@ -1,0 +1,782 @@
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001          list p=16F747
+                      00002          title "Case Study 3 Program - Mode 3 Test"
+                      00003 ; ***************************************************
+                      00004 ; 
+                      00005 ; This program runs on Case Study 3 Board. Bottom 4 bits of Port B
+                      00006 ; connect to Four LEDs. Bits 2, 6, and 7 of Port D are ready and drive LEDs.
+                      00007 ; Port C is connected to two switches (PortC pin 7 is green)
+                      00008 ; (PortC pin 6 is red pushutton). Port E is potentiometer (all inputs).
+                      00009 ;
+                      00010 ; ***************************************************
+                      00011         
+                      00012          #include <p16F747.INC>
+                      00001         LIST
+                      00002 
+                      00003 ;==========================================================================
+                      00004 ; Build date : Sep 19 2017
+                      00005 ;  MPASM PIC16F747 processor include
+                      00006 ; 
+                      00007 ;  (c) Copyright 1999-2017 Microchip Technology, All rights reserved
+                      00008 ;==========================================================================
+                      00009 
+                      00671         LIST
+2007   3FA2           00013      __config _CONFIG1, _FOSC_HS & _CP_OFF & _DEBUG_OFF & _VBOR_2_0 & _BOREN_0 & _MCLR_ON & _PWRTE_ON & 
+                            _WDT_OFF
+2008   3FBC           00014      __config _CONFIG2, _BORSEN_0 & _IESO_OFF & _FCMEN_OFF 
+                      00015 ; Note: the format for the CONFIG directive starts with a double underscore.
+                      00016 ; The above directive sets the oscillator to an external high speed clock,
+                      00017 ; sets the watchdog timer off, sets the power up timer on, sets the system
+                      00018 ; clear on (which enables the reset pin) and turns code protect off among
+                      00019 ; other things.
+                      00020 ;       
+                      00021 ; Variable declarations    
+Warning[207]: Found label after column 1. (Count)
+  00000020            00022          Count equ 20h ; the counter(for modes 2 and 4)
+Warning[207]: Found label after column 1. (Temp)
+  00000021            00023          Temp equ 21h ; a temporary register
+Warning[207]: Found label after column 1. (State)
+  00000022            00024          State equ 22h ; the program state register
+Warning[207]: Found label after column 1. (Mode)
+  00000023            00025          Mode equ 23h ; what mode we are in
+Warning[207]: Found label after column 1. (Control)
+  00000024            00026          Control equ 24h ; control value (of potentiometer)
+                      00027 
+                      00028              org 00h                    ; interrupt vector
+0000   2???           00029              goto SwitchCheck           ; initialize ports
+                      00030              
+                      00031 ;            org 04h
+                      00032 ;            goto isrServie             ; goto interrupt service routine
+                      00033              
+                      00034              org 15h                    ; Beginning of program storage
+                      00035 
+0015                  00036 SwitchCheck
+0015   2???           00037              call initPort              ; initialize ports
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  2
+Case Study 3 Program - Mode 3 Test
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00038 ;
+                      00039 ; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+                      00040 ;
+                      00041 ;           CS3 Program
+                      00042 ; 
+0016                  00043 ResetProgram
+0016   01A0           00044              clrf Count                 ; zero the counter
+0017   01A1           00045              clrf Temp                  ; zero the temporary register
+0018   01A2           00046              clrf State                 ; zero the state
+0019   01A4           00047              clrf Control               ; zero potentiometer value
+                      00048              
+001A   3003           00049              movlw D'3'                 ; load Mode with decimal 3
+001B   00A3           00050              movwf Mode                 ; LATER REPLACE w/ octal reading, cmple
+                      00051              
+001C   3003           00052              movlw B'00000011'          ; set LED to indicate mode 3
+001D   0086           00053              movwf PORTB
+                      00054              
+001E                  00055 WaitPress
+001E   1F87           00056              btfss PORTC,7              ; skip if green button pressed
+001F   2???           00057              goto GreenPress            ; green button is pressed - goto routine
+                      00058              
+0020   1F07           00059              btfss PORTC,6              ; see if red button pressed
+0021   2???           00060              goto RedPress              ; red button pressed - goto routine
+                      00061                      
+0022   2???           00062              goto WaitPress             ; keep checking
+                      00063              
+0023                  00064 GreenPress  
+0023   1B87           00065              btfsc PORTC,7              ; see if green button pressed     
+0024   2???           00066              goto WaitPress  
+                      00067 
+0025                  00068 GreenRelease
+0025   1F87           00069              btfss PORTC,7              ; see if green button released
+0026   2???           00070              goto GreenRelease          ; no - keep waiting
+                      00071              
+                      00072 ;            call SwitchDelay           ; let switch debounce
+                      00073 ;            goto ResetProgram          ; change the mode or reset the mode
+                      00074              
+0027                  00075 RedPress
+0027   1B07           00076              btfsc PORTC,6              ; check if red button pressed
+0028   2???           00077              goto WaitPress             ; no - keep waiting
+                      00078              
+0029                  00079 RedRelease
+0029   1F07           00080              btfss PORTC,6              ; skip if red button pressed
+002A   2???           00081              goto RedRelease
+                      00082              
+002B   2???           00083              call SwitchDelay           ; let switch debounce
+                      00084 ;            goto ResetProgram          ; change the mode or reset the mode
+                      00085              
+002C                  00086 Main
+002C   1B07           00087              btfsc PORTC, 6             ; red button pressed == activate control
+                      00088              
+002D   3004           00089              movlw B'00000100'          ; turn on Ready LED
+002E   0088           00090              movwf PORTD                ; CHECKPOINT passed
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  3
+Case Study 3 Program - Mode 3 Test
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00091              
+002F   3007           00092              movlw B'00000111'          ; 
+0030   0088           00093              movwf PORTD                ; CHECKPOINT 2.2
+                      00094              
+0031   2???           00095              goto AtoD                  ; read control potentiometer value
+                      00096              ; here should actually disengage the solenoid instead of running engage
+0032   1506           00097              bsf PORTB,2                ; CHECKPOINT 2.1 DID NOT PASS
+0033   2???           00098              call Engage                ; control the solenoid
+                      00099 
+0034                  00100 AtoD
+0034   2???           00101              call initAD                ; initialize A/D
+0035   2???           00102              call SetupDelay            ; delay for Tad
+0036   151F           00103              bsf ADCON0,GO              ; start A/D conversion    
+0037   0008           00104              return
+                      00105 
+0038                  00106 Engage
+0038   191F           00107              btfsc ADCON0,GO            ; check if A/D conversion complete
+0039   2???           00108              goto Engage                ; wait if no
+                      00109              
+003A   081E           00110              movf ADRESH,W              ; store value in W register
+003B   00A4           00111              movwf Control              ; store value in Control variable
+                      00112              
+003C   3000           00113              movlw 0h
+003D   1103           00114              bcf STATUS,Z
+                      00115              
+003E   0624           00116              xorwf Control,0            ; check for fault
+                      00117              
+003F   1903           00118              btfsc STATUS,Z
+0040   2???           00119              goto SensorFault           ; if 0 --> goto error
+                      00120              
+0041   3070           00121              movlw 70h
+0042   0224           00122              subwf Control,0
+0043   1803           00123              btfsc STATUS,C             ; C = 1 when the result of subwf is pos
+                      00124              
+0044   1788           00125              bsf PORTD,7                ; turn on transistor
+0045   1508           00126              bsf PORTD,2                ; turn on Engaged LED
+                      00127              
+0046   1C07           00128              btfss PORTC,0              ; see if solenoid engaged
+0047   2???           00129              goto Engage
+                      00130              
+0048   1708           00131              bsf PORTD,6                ; turn on reduced transistor
+0049   1388           00132              bcf PORTD,7                ; turn off main transistor
+                      00133              
+004A   1C03           00134              btfss STATUS,C             ; if negative
+                      00135              
+004B   1388           00136              bcf PORTD,7                ; turn off main transitor
+004C   1308           00137              bcf PORTD,6                ; turn off reduced transistor
+                      00138                      
+004D   2824           00139              goto Control 
+                      00140              
+004E                  00141 SensorFault
+004E   0822           00142              movf State, W          
+004F   0086           00143              movwf PORTB
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  4
+Case Study 3 Program - Mode 3 Test
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0050   0188           00144              clrf PORTD
+0051   1586           00145              bsf PORTB,3                 ; CHECKPOINT 2 
+                      00146              
+                      00147                      
+0052                  00148 SwitchDelay
+0052   3014           00149              movlw D'20'                 ; load Temp with decimal 20
+0053   00A1           00150              movwf Temp
+0054   0008           00151              return
+                      00152              
+                      00153 ;
+                      00154 ; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+                      00155 ;
+                      00156 ; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                      00157 ;
+                      00158 ; Port Initialization Subroutine
+0055                  00159 initPort
+                      00160              ;clrf PORTA ; for the potentiometer
+0055   0186           00161              clrf PORTB ; 0-2/3 pins for mode/fault indication respectively (output)
+0056   0187           00162              clrf PORTC ; octal switch, 6,7 pins for green/red pushbutton           
+0057   0188           00163              clrf PORTD ; 2, 6, 7 for LEDs and transistors
+0058   0189           00164              clrf PORTE ; 0-2 pins for the octal input (complement of the mode) (input)
+                      00165 
+0059   1683           00166              bsf STATUS, RP0 ; Set bit in STATUS register for bank 1
+                      00167              
+005A   300E           00168              movlw   B'00001110' ; RA0 analog input, all other digital
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+005B   009F           00169              movwf   ADCON1 ; move to special function A/D register
+                      00170 
+005C   30F0           00171              movlw B'11110000'; load binary number onto W registry (pins 0-3 out)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+005D   0086           00172              movwf TRISB ; load W into TRISB
+                      00173             
+005E   30FF           00174              movlw B'11111111'; load binary number onto W registry (all inputs)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+005F   0087           00175              movwf TRISC ; Configure Port C as all inputs
+                      00176             
+0060   303B           00177              movlw B'00111011'; load binary number onto W registry (pins 2, 6, 7)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0061   0088           00178              movwf TRISD ; load W into TRISD
+                      00179             
+0062   30FF           00180              movlw B'11111111'; load binary number onto W registry (all input)
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0063   0089           00181              movwf TRISE ; load W into TRISE
+                      00182              
+0064   1283           00183              bcf STATUS, RP0 ; Clear bit in STATUS register for bank 0
+0065   0008           00184              return
+                      00185 
+                      00186 ; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                      00187 ;
+                      00188 ;  InitializeAD - initializes and sets up the A/D hardware.
+                      00189 ;  Select AN0 to AN3 as analog inputs, proper clock period, and read AN0.
+                      00190 ;
+0066                  00191 initAD
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  5
+Case Study 3 Program - Mode 3 Test
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0066   1683           00192              bsf STATUS,RP0      ; select register bank 1
+0067   300E           00193              movlw B'00001110'     ; RA0 analog input, all other digital
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0068   009F           00194              movwf ADCON1          ; move to special function A/D register
+0069   1283           00195              bcf STATUS,RP0      ; select register bank 0
+006A   3041           00196              movlw B'01000001'     ; select 8 * oscillator, analog input 0, turn on
+006B   009F           00197              movwf ADCON0         ; move to special function A/D register
+006C   0008           00198              return
+                      00199 
+                      00200 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                      00201 ; 
+                      00202 ;  This routine is a software delay of 10uS required for the A/D setup.
+                      00203 ;  At a 4Mhz clock, the loop takes 3uS, so initialize the register Temp with
+                      00204 ;  a value of 3 to give 9uS, plus the move etc. should result in
+                      00205 ;  a total time of > 10uS.
+                      00206 
+006D                  00207 SetupDelay 
+006D   3003           00208              movlw 03h              ; load Temp with hex 3
+006E   00A1           00209              movwf Temp      
+006F   0008           00210              return
+                      00211              
+                      00212 ; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                      00213 ;
+                      00214 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                      00215 ;
+                      00216 ; Note: this is a dummy interrupt service routine. It is good programming
+                      00217 ; practice to have it. If interrupts are enabled (which they should not be)
+                      00218 ; and if an interrupt occurs (which should not happen), this routine safely
+                      00219 ; hangs up the microcomputer in an infinite loop.
+0070                  00220 isrService
+0070   2???           00221              goto isrService ; error - - stay here
+                      00222 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+3FA2 3FBC             00223              end
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  6
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ACKDT                             00000005
+ACKEN                             00000004
+ACKSTAT                           00000006
+ACQT0                             00000003
+ACQT1                             00000004
+ACQT2                             00000005
+ADCON0                            0000001F
+ADCON1                            0000009F
+ADCON2                            0000009B
+ADCS0                             00000006
+ADCS1                             00000007
+ADCS2                             00000006
+ADDEN                             00000003
+ADFM                              00000007
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADRESH                            0000001E
+ADRESL                            0000009E
+AtoD                              00000034
+BCLIE                             00000003
+BCLIF                             00000003
+BF                                00000000
+BRGH                              00000002
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCP2CON                           0000001D
+CCP2IE                            00000000
+CCP2IF                            00000000
+CCP2M0                            00000000
+CCP2M1                            00000001
+CCP2M2                            00000002
+CCP2M3                            00000003
+CCP2X                             00000005
+CCP2Y                             00000004
+CCP3CON                           00000097
+CCP3IE                            00000001
+CCP3IF                            00000001
+CCP3M0                            00000000
+CCP3M1                            00000001
+CCP3M2                            00000002
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  7
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+CCP3M3                            00000003
+CCP3X                             00000005
+CCP3Y                             00000004
+CCPR1                             00000015
+CCPR1H                            00000016
+CCPR1L                            00000015
+CCPR2                             0000001B
+CCPR2H                            0000001C
+CCPR2L                            0000001B
+CCPR3                             00000095
+CCPR3H                            00000096
+CCPR3L                            00000095
+CHS0                              00000003
+CHS1                              00000004
+CHS2                              00000005
+CHS3                              00000001
+CIS                               00000003
+CKE                               00000006
+CKP                               00000004
+CM0                               00000000
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000009C
+CMIE                              00000006
+CMIF                              00000006
+CREN                              00000004
+CSRC                              00000007
+CVR0                              00000000
+CVR1                              00000001
+CVR2                              00000002
+CVR3                              00000003
+CVRCON                            0000009D
+CVREN                             00000007
+CVROE                             00000006
+CVRR                              00000005
+Control                           00000024
+Count                             00000020
+D                                 00000005
+DATA_ADDRESS                      00000005
+DC                                00000001
+D_A                               00000005
+D_NOT_A                           00000005
+Engage                            00000038
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GCEN                              00000007
+GIE                               00000007
+GO                                00000002
+GO_DONE                           00000002
+GO_NOT_DONE                       00000002
+GreenPress                        00000023
+GreenRelease                      00000025
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  8
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+I2C_DATA                          00000005
+I2C_READ                          00000002
+I2C_START                         00000003
+I2C_STOP                          00000004
+IBF                               00000007
+IBOV                              00000005
+INDF                              00000000
+INT0IE                            00000004
+INT0IF                            00000001
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IOFS                              00000002
+IRCF0                             00000004
+IRCF1                             00000005
+IRCF2                             00000006
+IRP                               00000007
+IRVST                             00000005
+LVDCON                            00000109
+LVDEN                             00000004
+LVDIE                             00000005
+LVDIF                             00000005
+LVDL0                             00000000
+LVDL1                             00000001
+LVDL2                             00000002
+LVDL3                             00000003
+Main                              0000002C
+Mode                              00000023
+NOT_A                             00000005
+NOT_ADDRESS                       00000005
+NOT_BO                            00000000
+NOT_BOR                           00000000
+NOT_DONE                          00000002
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_RC8                           00000006
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_TX8                           00000006
+NOT_W                             00000002
+NOT_WRITE                         00000002
+OBF                               00000006
+OERR                              00000001
+OPTION_REG                        00000081
+OSCCON                            0000008F
+OSCTUNE                           00000090
+OSFIE                             00000007
+OSFIF                             00000007
+OSTS                              00000003
+P                                 00000004
+PCFG0                             00000000
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE  9
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+PCFG1                             00000001
+PCFG2                             00000002
+PCFG3                             00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PEN                               00000002
+PIE1                              0000008C
+PIE2                              0000008D
+PIR1                              0000000C
+PIR2                              0000000D
+PMADR                             0000010D
+PMADRH                            0000010F
+PMCON1                            0000018C
+PMDATA                            0000010C
+PMDATH                            0000010E
+PORTA                             00000005
+PORTB                             00000006
+PORTC                             00000007
+PORTD                             00000008
+PORTE                             00000009
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PSPIE                             00000007
+PSPIF                             00000007
+PSPMODE                           00000004
+R                                 00000002
+RA0                               00000000
+RA1                               00000001
+RA2                               00000002
+RA3                               00000003
+RA4                               00000004
+RA5                               00000005
+RA6                               00000006
+RA7                               00000007
+RB0                               00000000
+RB1                               00000001
+RB2                               00000002
+RB3                               00000003
+RB4                               00000004
+RB5                               00000005
+RB6                               00000006
+RB7                               00000007
+RBIE                              00000003
+RBIF                              00000000
+RC0                               00000000
+RC1                               00000001
+RC2                               00000002
+RC3                               00000003
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE 10
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+RC4                               00000004
+RC5                               00000005
+RC6                               00000006
+RC7                               00000007
+RC8_9                             00000006
+RC9                               00000006
+RCD8                              00000000
+RCEN                              00000003
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RD0                               00000000
+RD1                               00000001
+RD2                               00000002
+RD3                               00000003
+RD4                               00000004
+RD5                               00000005
+RD6                               00000006
+RD7                               00000007
+RE0                               00000000
+RE1                               00000001
+RE2                               00000002
+RE3                               00000003
+READ_WRITE                        00000002
+RP0                               00000005
+RP1                               00000006
+RSEN                              00000001
+RX9                               00000006
+RX9D                              00000000
+R_NOT_W                           00000002
+R_W                               00000002
+RedPress                          00000027
+RedRelease                        00000029
+ResetProgram                      00000016
+S                                 00000003
+SBOREN                            00000002
+SCS0                              00000000
+SCS1                              00000001
+SEN                               00000000
+SMP                               00000007
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+SSPADD                            00000093
+SSPBUF                            00000013
+SSPCON                            00000014
+SSPCON2                           00000091
+SSPEN                             00000005
+SSPIE                             00000003
+SSPIF                             00000003
+SSPM0                             00000000
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE 11
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+SSPM1                             00000001
+SSPM2                             00000002
+SSPM3                             00000003
+SSPOV                             00000006
+SSPSTAT                           00000094
+STATUS                            00000003
+SWDTE                             00000000
+SWDTEN                            00000000
+SYNC                              00000004
+SensorFault                       0000004E
+SetupDelay                        0000006D
+State                             00000022
+SwitchCheck                       00000015
+SwitchDelay                       00000052
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1INSYNC                          00000002
+T1OSCEN                           00000003
+T1RUN                             00000006
+T1SYNC                            00000002
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR0IE                            00000005
+TMR0IF                            00000002
+TMR1                              0000000E
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISA0                            00000000
+TRISA1                            00000001
+TRISA2                            00000002
+TRISA3                            00000003
+TRISA4                            00000004
+TRISA5                            00000005
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE 12
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+TRISA6                            00000006
+TRISA7                            00000007
+TRISB                             00000086
+TRISB0                            00000000
+TRISB1                            00000001
+TRISB2                            00000002
+TRISB3                            00000003
+TRISB4                            00000004
+TRISB5                            00000005
+TRISB6                            00000006
+TRISB7                            00000007
+TRISC                             00000087
+TRISC0                            00000000
+TRISC1                            00000001
+TRISC2                            00000002
+TRISC3                            00000003
+TRISC4                            00000004
+TRISC5                            00000005
+TRISC6                            00000006
+TRISC7                            00000007
+TRISD                             00000088
+TRISD0                            00000000
+TRISD1                            00000001
+TRISD2                            00000002
+TRISD3                            00000003
+TRISD4                            00000004
+TRISD5                            00000005
+TRISD6                            00000006
+TRISD7                            00000007
+TRISE                             00000089
+TRISE0                            00000000
+TRISE1                            00000001
+TRISE2                            00000002
+TRISE3                            00000003
+TRMT                              00000001
+TUN0                              00000000
+TUN1                              00000001
+TUN2                              00000002
+TUN3                              00000003
+TUN4                              00000004
+TUN5                              00000005
+TX8_9                             00000006
+TX9                               00000006
+TX9D                              00000000
+TXD8                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+Temp                              00000021
+UA                                00000001
+VCFG0                             00000004
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE 13
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+VCFG1                             00000005
+W                                 00000000
+WCOL                              00000007
+WDTCON                            00000105
+WDTPS0                            00000001
+WDTPS1                            00000002
+WDTPS2                            00000003
+WDTPS3                            00000004
+WaitPress                         0000001E
+Z                                 00000002
+_BOREN_0                          00003FBF
+_BOREN_1                          00003FFF
+_BOREN_OFF                        00003FBF
+_BOREN_ON                         00003FFF
+_BORSEN_0                         00003FBF
+_BORSEN_1                         00003FFF
+_BORSEN_OFF                       00003FBF
+_BORSEN_ON                        00003FFF
+_BORV_20                          00003FFF
+_BORV_27                          00003F7F
+_BORV_42                          00003EFF
+_BORV_45                          00003E7F
+_CCP2MX_RB3                       00002FFF
+_CCP2MX_RC1                       00003FFF
+_CCP2_RB3                         00002FFF
+_CCP2_RC1                         00003FFF
+_CONFIG1                          00002007
+_CONFIG2                          00002008
+_CP_ALL                           00001FFF
+_CP_OFF                           00003FFF
+_CP_ON                            00001FFF
+_DEBUG_OFF                        00003FFF
+_DEBUG_ON                         000037FF
+_DEVID1                           00002006
+_EXTCLK                           00003FEF
+_EXTRC_CLKOUT                     00003FFF
+_EXTRC_IO                         00003FFE
+_FCMEN_OFF                        00003FFE
+_FCMEN_ON                         00003FFF
+_FOSC_EC                          00003FEF
+_FOSC_EXTRCCLK                    00003FFF
+_FOSC_EXTRCIO                     00003FFE
+_FOSC_HS                          00003FEE
+_FOSC_INTOSCCLK                   00003FFD
+_FOSC_INTOSCIO                    00003FFC
+_FOSC_LP                          00003FEC
+_FOSC_XT                          00003FED
+_HS_OSC                           00003FEE
+_IDLOC0                           00002000
+_IDLOC1                           00002001
+_IDLOC2                           00002002
+_IDLOC3                           00002003
+_IESO_OFF                         00003FFD
+MPASM 5.76                         MODE3.ASM   3-23-2023  3:12:46         PAGE 14
+Case Study 3 Program - Mode 3 Test
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+_IESO_ON                          00003FFF
+_INTRC_CLKOUT                     00003FFD
+_INTRC_IO                         00003FFC
+_LP_OSC                           00003FEC
+_MCLRE_OFF                        00003FDF
+_MCLRE_ON                         00003FFF
+_MCLR_OFF                         00003FDF
+_MCLR_ON                          00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_VBOR_2_0                         00003FFF
+_VBOR_2_7                         00003F7F
+_VBOR_4_2                         00003EFF
+_VBOR_4_5                         00003E7F
+_WDTE_OFF                         00003FFB
+_WDTE_ON                          00003FFF
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_XT_OSC                           00003FED
+__16F747                          00000001
+initAD                            00000066
+initPort                          00000055
+isrService                        00000070
+
+Errors   :     0
+Warnings :     5 reported,     0 suppressed
+Messages :     6 reported,     0 suppressed
+
+

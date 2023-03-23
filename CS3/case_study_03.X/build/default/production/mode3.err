@@ -1,0 +1,11 @@
+Warning[207] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 22 : Found label after column 1. (Count)
+Warning[207] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 23 : Found label after column 1. (Temp)
+Warning[207] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 24 : Found label after column 1. (State)
+Warning[207] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 25 : Found label after column 1. (Mode)
+Warning[207] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 26 : Found label after column 1. (Control)
+Message[302] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 169 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 172 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 175 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 178 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 181 : Register in operand not in bank 0.  Ensure that bank bits are correct.
+Message[302] C:\USERS\SK4697\MPLABXPROJECTS\CASE_STUDY_03.X\MODE3.ASM 194 : Register in operand not in bank 0.  Ensure that bank bits are correct.
