@@ -69,7 +69,7 @@ GreenRelease
 	     btfss PORTC,7              ; see if green button released
 	     goto GreenRelease	        ; no - keep waiting
 	     
-;	     call SwitchDelay           ; let switch debounce
+	     call SwitchDelay           ; let switch debounce
 ;	     goto ResetProgram          ; change the mode or reset the mode
 	     
 RedPress
@@ -89,37 +89,45 @@ Main
 	     movlw B'00000100'          ; turn on Ready LED
 	     movwf PORTD                ; CHECKPOINT passed
 	     
-	     movlw B'00000111'          ; 
-	     movwf PORTD                ; CHECKPOINT 2.2 DOES NOT PASS, STUCK
+	     goto AtoD                  ; read control potentiometer value  
 	     
-	     goto AtoD                  ; read control potentiometer value
-	     ; here should actually disengage the solenoid instead of running engage
-	     bsf PORTB,2                ; CHECKPOINT 2.1 DID NOT PASS
-	     call Engage                ; control the solenoid
-
+	     goto Engage
+	     
 AtoD
 	     call initAD                ; initialize A/D
 	     call SetupDelay            ; delay for Tad
-	     bsf ADCON0,GO              ; start A/D conversion	  
+	     bsf ADCON0,GO              ; start A/D conversion
+	     call waitLoop
 	     return
-
-Engage
-	     btfsc ADCON0,GO            ; check if A/D conversion complete
-	     goto Engage                ; wait if no
+waitLoop
+	     btfsc ADCON0,GO            ; check if A/D is finished
+	     goto waitLoop              ; loop right here until A/D finished
 	     
-	     movf ADRESH,W              ; store value in W register
-	     movwf Control              ; store value in Control variable
+	     btfsc ADCON0,GO            ; check if A/D is finished
+	     goto waitLoop              ; not finished, keep looping
+	     movf ADRESH,W              ; get A/D value
+	     movwf Control              ; store value in Control var
 	     
-	     movlw 0h
-	     bcf STATUS,Z
+;	     bsf ADCON0,GO              ; restart A/D conversion
+;	     goto waitLoop              ; return to loop
+Engage     	       
+	     bcf STATUS, Z              ; clear the register to compare
+	     xorwf Control,0            ; is the value of pot == 0? <CHECK >
+	     btfsc STATUS,Z             ; if 0 --> goto error
+	     goto SensorFault           ; if status of register after 
 	     
-	     xorwf Control,0            ; check for fault
-	     
-	     btfsc STATUS,Z
-	     goto SensorFault           ; if 0 --> goto error
-	     
+	     ;	     xorwf Control,0            ; check for fault
+;	     
+;	     btfsc STATUS,Z
+;	     goto SensorFault           ; if 0 --> goto error
+ 
 	     movlw 70h
-	     subwf Control,0
+	     subwf Control, 0
+	     btfsc 
+	     sublw Control,70h          ; subtract pot value from 70h
+	     
+	     
+	     
 	     btfsc STATUS,C             ; C = 1 when the result of subwf is pos
 	     
 	     bsf PORTD,7                ; turn on transistor
@@ -139,16 +147,17 @@ Engage
 	     goto Control 
 	     
 SensorFault
-	     movf State, W          
+	     movlw B'00001011'          ; CHECKPOINT 2.2 NOT PASSED 
 	     movwf PORTB
-	     clrf PORTD
-	     bsf PORTB,3                 ; CHECKPOINT 2 
+;	     movf State, W          
+;	     movwf PORTB
+;	     clrf PORTD
+;	     bsf PORTB,3            
 	     
 	   	     
 SwitchDelay
 	     movlw D'20'                 ; load Temp with decimal 20
 	     movwf Temp
-	     return
 	     
 ;
 ; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
@@ -165,9 +174,6 @@ initPort
 
 	     bsf STATUS, RP0 ; Set bit in STATUS register for bank 1
 	     
-	     movlw   B'00001110' ; RA0 analog input, all other digital
-	     movwf   ADCON1 ; move to special function A/D register
-
 	     movlw B'11110000'; load binary number onto W registry (pins 0-3 out)
 	     movwf TRISB ; load W into TRISB
 	    
@@ -180,6 +186,9 @@ initPort
 	     movlw B'11111111'; load binary number onto W registry (all input)
 	     movwf TRISE ; load W into TRISE
 	     
+	     movlw   B'00001110' ; RA0 analog input, all other digital
+	     movwf   ADCON1 ; move to special function A/D register
+	     
 	     bcf STATUS, RP0 ; Clear bit in STATUS register for bank 0
 	     return
 
@@ -189,12 +198,12 @@ initPort
 ;  Select AN0 to AN3 as analog inputs, proper clock period, and read AN0.
 ;
 initAD
-             bsf STATUS,RP0      ; select register bank 1
-             movlw B'00001110'     ; RA0 analog input, all other digital
-             movwf ADCON1          ; move to special function A/D register
-             bcf STATUS,RP0      ; select register bank 0
-             movlw B'01000001'     ; select 8 * oscillator, analog input 0, turn on
-             movwf ADCON0         ; move to special function A/D register
+             bsf STATUS,RP0             ; select register bank 1
+             movlw B'00001110'          ; RA0 analog input, all other digital
+             movwf ADCON1               ; move to special function A/D register
+             bcf STATUS,RP0             ; select register bank 0
+             movlw B'01000001'          ; select 8 * oscillator, analog input 0, turn on
+             movwf ADCON0               ; move to special function A/D register
              return
 
 ;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -221,3 +230,5 @@ isrService
              goto isrService ; error - - stay here
 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
              end
+
+
