@@ -162,8 +162,6 @@ delay
 ModeFault
 		bsf     PORTB, 3
 
-
-
 Fault
 	    ; turn the fault LED on
 	    ; wait for black reset switch
