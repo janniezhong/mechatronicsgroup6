@@ -39,63 +39,131 @@ SwitchCheck
 	    
 ;	    CS3 Program
 ;	    
-ResetProgram ;turn off transistors?
+ResetProgram ;turn off transistors, reset LEDs
 	    clrf    Count		    ; zero the counter
 	    clrf    Temp                    ; zero the temporary register
 	    clrf    State                   ; zero the state
-waitPress
-	    btfss   PORTC,0		    ; see if green button pressed
+waitGreenPress
+	    btfss   PORTC,7		        ; see if green button pressed
 	    goto    GreenPress		    ; green button is pressed - goto routine
-	    goto    waitPress		    ; keep checking
+	    goto    waitGreenPress		    ; keep checking
 GreenPress
 	    call    SwitchDelay		    ; let switch debounce 
-	    btfsc   PORTC,0		    ; see if green button still pressed
-	    goto    waitPress		    ; noise - not pressed - keep checking
+	    btfsc   PORTC,7		        ; see if green button still pressed
+	    goto    waitGreenPress		    ; noise - not pressed - keep checking
+		goto    GreenRelease
 GreenRelease
-	    btfss   PORTC,0		    ; see if green button released
+	    btfss   PORTC,7		        ; see if green button released
 	    goto    GreenRelease	    ; no - keep waiting
+		goto    ReadMode
 	    
-	    ;goto    IncCount		    ; increment the counter & output
 
 ReadMode
 	    movlw   PORTE                   ; read the mode switch from PORTE into W
 	    comf    W, Temp		    ; flip all bits, store in Temp
-	    movlw   B'11111000'             ; subtract upper bits
-	    subwf   Temp, State		    ; store mode in State
+	    andlw   B'00000111'             ; subtract upper bits
+	    movwf   State		    ; store mode in State
 	    movf    State, PORTB            ; move state to port B to display
-	    
-	    movlw   B'00000001'		    ; check if state is not 1-4
-	    xorwf  W, Temp
-	    btfss  STATUS, Z		    ;if equal values will be zero
-	    goto ModeOne
-	    
-	    movlw   B'00000010'		    ; check if state is not 1-4
-	    xorwf  W, Temp
-	    btfss  STATUS, Z		    ;if equal values will be zero
-	    goto ModeTwo
-	    
-	    movlw   B'00000011'		    ; check if state is not 1-4
-	    xorwf  W, Temp
-	    btfss  STATUS, Z		    ;if equal values will be zero
-	    goto ModeThree
-	    
-	    movlw   B'00000100'		    ; check if state is not 1-4
-	    xorwf  W, Temp
-	    btfss  STATUS, Z		    ;if equal values will be zero
-	    goto ModeFour
-	    
-	    ; if not mode 1-4,
-	    bsf PORTB, 3
+
+
+		movf    State, w			; move state to W
+	    xorlw   B'11111110'		    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto	ModeOne
+
+		movf    State, w			; move state to W
+	    xorlw   B'11111101'		    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto	ModeTwo
+		
+		movf    State, w			; move state to W
+	    xorlw   B'11111100'		    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto	ModeThree
+
+		movf    State, w			; move state to W
+	    xorlw   B'11111011'		    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto	ModeFour
+
+
+		movf    State, w			; move state to W
+	    xorlw   B'11111111'		    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto	ModeFault
+
+		movf    State, w			; move state to W
+	    xorlw   B'11111010'		    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto	ModeFault
+
+		movf    State, w			; move state to W
+	    xorlw   B'11111011'		    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto	ModeFault
+
+		movf    State, w			; move state to W
+	    xorlw   B'11111000'		    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto	ModeFault
+		
+		goto    waitGreenPress
+
+ModeOne
+		bcf PORTB, 3
+		goto waitModeOne
+
+
+waitModeOne
+		btfss PORTC, 7
+		goto GreenPress             ; should make sure we turn off the main transistor here
+
+		btfss PORTC, 6
+		goto RedPress
+
+		goto waitModeOne
+
+RedPress
+		call SwitchDelay
+		btfsc PORTC, 6
+		goto waitRedPress
+		gotoRedRelease
+
+waitRedPress
+	    btfss   PORTC,6		        ; see if red button pressed
+	    goto    GreenPress		    ; red button is pressed - goto routine
+	    goto    waitGreenPress		    ; keep checking
+
+RedRelease
+	    btfss   PORTC,6		        ; see if green button released
+	    goto    RedRelease	        ; no - keep waiting
+		goto    ToggleTransistor    ; write subroutine to toggle transistor
+
+
+
+
+	   
+
+ModeFault
+		bsf     PORTB, 3
+		; turn off solenoids (transistors)
+		goto    waitGreenPress           ; not sure about this? idk where the black reset switch is tho 
 	    
 	    
 SwitchDelay 
-	    movlw   D'20'		    ; load Temp with decimal 20
+	    movlw   D'10'		    ; load Temp with decimal 20
 	    movwf   Temp
 delay
 	    decfsz  Temp, F		    ; 60 usec delay loop
 	    goto    delay		    ; loop until count equals zero
 	    return	                    ; return to calling routine
-	    
+	   
+
+ModeFault
+		bsf     PORTB, 3
+
+
+
 Fault
 	    ; turn the fault LED on
 	    ; wait for black reset switch
@@ -109,27 +177,33 @@ Reset
 initPort
 	    clrf    PORTA ; for the potentiometer
 	    clrf    PORTB ; 0-2/3 pins for mode/fault indication respectively (output)
-	    clrf    PORTC ; 0/1 pins for green/red pushbutton respectively (input)	    
-	    clrf    PORTD ; 0-1 pins for the solenoid (output), #2 pin for the sensor (input) -- describe this in our general comments
+	    clrf    PORTC ; 7/_ pins for green/red pushbutton respectively (input)	    
+	    clrf    PORTD ; 0-1 pins for the solenoid (output), #_ pin for the sensor (input) -- describe this in our general comments
 	    clrf    PORTE ; 0-2 pins for the octal input (complement of the mode) (input)
 
 	    bsf	    STATUS, RP0 ; select status bank 1 <- or bank 0? not sure
 	    
-	    movlw   B'00001110' ; select analog input **check this value
-	    movwf   ADCON1 ; set port A to analog input
+	    movlw   B'11111111' ; select analog input
+	    movwf   TRISA ; set port A to analog input
 
-	    movlw   B'00001111'; load binary number onto W registry (all input except 0-3)
+	    movlw   B'11110000'; load binary number onto W registry (all input except 0-3)
 	    movwf   TRISB ; load W into TRISB
 	    movlw   B'11111111'; load binary number onto W registry (all input)
 	    movwf   TRISC ; load W into TRISC
 	    
-	    movlw   B'11111100'; load binary number onto W registry (all input)
+	    movlw   B'00011100'; load binary number onto W registry (all input)
 	    movwf   TRISD ; load W into TRISD
 	    
-	    movlw   B'11111111'; load binary number onto W registry (all input)
-	    movwf   TRISE ; load W into TRISC
+	    movlw   B'00000111'; load binary number onto W registry (all input)
+	    movwf   TRISE ; load W into TRISE
 	    
+		movlw   B'00001110' ; select analog input
+	    movwf   ADCON1 ; set port A to analog input
 	    bcf	    STATUS, RP0 ; clear bank 0
+
+;		movlw   B'01000001'
+;       movwf   ADCON0
+
 	    return
 ; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
