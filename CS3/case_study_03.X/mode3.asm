@@ -53,13 +53,14 @@ ResetProgram
 	     movwf PORTB
 	     
 WaitPress
+	     clrf PORTD                 ; turn off solenoid and ready LED
 	     btfss PORTC,7		; skip if green button pressed
 	     goto GreenPress	        ; green button is pressed - goto routine
 	     
 	     btfss PORTC,6              ; see if red button pressed
 	     goto RedPress              ; red button pressed - goto routine
 	     	     
-	     goto WaitPress             ; keep checking
+	     goto WaitPress             ; keep checking   
 	     
 GreenPress  
 	     btfsc PORTC,7              ; see if green button pressed	  
@@ -71,7 +72,7 @@ GreenRelease
 	     
 	     call SwitchDelay           ; let switch debounce
 ;	     goto ResetProgram          ; change the mode or reset the mode
-	     
+	    
 RedPress
 	     btfsc PORTC,6              ; check if red button pressed
 	     goto WaitPress             ; no - keep waiting
@@ -80,9 +81,11 @@ RedRelease
 	     btfss PORTC,6              ; skip if red button pressed
 	     goto RedRelease
 	     
-	     call SwitchDelay           ; let switch debounce
-;	     goto ResetProgram          ; change the mode or reset the mode
+	     btfsc PORTD,2              ; if ready light active
+	     goto WaitPress
 	     
+	     call SwitchDelay           ; let switch debounce
+
 Main
 	     btfsc PORTC, 6             ; red button pressed == activate control
 	     
@@ -91,14 +94,12 @@ Main
 	     
 	     goto AtoD                  ; read control potentiometer value  
 	     
-	     goto Engage
-	     
 AtoD
 	     call initAD                ; initialize A/D
 	     call SetupDelay            ; delay for Tad
 	     bsf ADCON0,GO              ; start A/D conversion
 	     call waitLoop
-	     return
+	     
 waitLoop
 	     btfsc ADCON0,GO            ; check if A/D is finished
 	     goto waitLoop              ; loop right here until A/D finished
@@ -108,57 +109,52 @@ waitLoop
 	     movf ADRESH,W              ; get A/D value
 	     movwf Control              ; store value in Control var
 	     
-;	     bsf ADCON0,GO              ; restart A/D conversion
-;	     goto waitLoop              ; return to loop
-Engage     	       
-	     bcf STATUS, Z              ; clear the register to compare
-	     xorwf Control,0            ; is the value of pot == 0? <CHECK >
-	     btfsc STATUS,Z             ; if 0 --> goto error
-	     goto SensorFault           ; if status of register after 
-	     
-	     ;	     xorwf Control,0            ; check for fault
-;	     
-;	     btfsc STATUS,Z
-;	     goto SensorFault           ; if 0 --> goto error
- 
-	     movlw 70h
-	     subwf Control, 0
-	     btfsc 
-	     sublw Control,70h          ; subtract pot value from 70h
-	     
-	     
-	     
-	     btfsc STATUS,C             ; C = 1 when the result of subwf is pos
-	     
-	     bsf PORTD,7                ; turn on transistor
-	     bsf PORTD,2                ; turn on Engaged LED
-	     
-	     btfss PORTC,0              ; see if solenoid engaged
 	     goto Engage
 	     
-	     bsf PORTD,6                ; turn on reduced transistor
-	     bcf PORTD,7                ; turn off main transistor
+Engage
+; check for error
+	     movlw 0h  
+	     bcf STATUS,Z               ; clear the register to compare
+	     xorwf Control,0            ; is the value of pot == 0?
+	     btfsc STATUS,Z             ; if 0 --> goto error
+	     goto SensorFault
 	     
-	     btfss STATUS,C             ; if negative
+; compare if greater than or less than 70h
+	     movlw 70h                  ; move 70h to W  
+	     bcf STATUS,C               ; clear the C register to compare
+	     subwf Control,0            ; subtract Control from 70h
+	     btfsc STATUS,C             ; if result positive --> turn on solenoid
+	     bsf PORTD, 7
 	     
-	     bcf PORTD,7                ; turn off main transitor
-	     bcf PORTD,6                ; turn off reduced transistor
+	     btfss STATUS,C             ; if result negative --> turn off solenoid
+	     bcf PORTD, 7
+             
+	     btfss PORTC,6              ; check if red button pressed
+	     goto RedPress              ; if red button pressed, goto RedPress
+	     
+	     goto AtoD                  ; restart loop to keep reading pot val
+     
+	          
+	    
+SolenoidOn
+	     bsf PORTD, 7		; turn on main transistor
+	     return
+	     
+SolenoidOff
+	     bcf PORTD, 7                ; turn off main transistor
+	     return
 	     	     
-	     goto Control 
-	     
-SensorFault
-	     movlw B'00001011'          ; CHECKPOINT 2.2 NOT PASSED 
-	     movwf PORTB
-;	     movf State, W          
-;	     movwf PORTB
-;	     clrf PORTD
-;	     bsf PORTB,3            
-	     
-	   	     
 SwitchDelay
 	     movlw D'20'                 ; load Temp with decimal 20
 	     movwf Temp
+	     return
 	     
+SensorFault
+	     movlw B'00001011'          ; turn on error on mode 3 lights
+	     movwf PORTB
+	     clrf PORTD                 ; turn off solenoid and RDY light
+	     goto isrService
+       
 ;
 ; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
 ;
@@ -166,7 +162,6 @@ SwitchDelay
 ;
 ; Port Initialization Subroutine
 initPort
-	     ;clrf PORTA ; for the potentiometer
 	     clrf PORTB ; 0-2/3 pins for mode/fault indication respectively (output)
 	     clrf PORTC ; octal switch, 6,7 pins for green/red pushbutton	    
 	     clrf PORTD ; 2, 6, 7 for LEDs and transistors
@@ -174,24 +169,23 @@ initPort
 
 	     bsf STATUS, RP0 ; Set bit in STATUS register for bank 1
 	     
-	     movlw B'11110000'; load binary number onto W registry (pins 0-3 out)
+	     movlw B'11110000' ; load binary number onto W registry (pins 0-3 out)
 	     movwf TRISB ; load W into TRISB
 	    
-	     movlw B'11111111'; load binary number onto W registry (all inputs)
+	     movlw B'11111111' ; load binary number onto W registry (all inputs)
 	     movwf TRISC ; Configure Port C as all inputs
 	    
-	     movlw B'00111011'; load binary number onto W registry (pins 2, 6, 7)
+	     movlw B'00111000' ; load binary number onto W registry (pins 2, 6, 7)
 	     movwf TRISD ; load W into TRISD
 	    
-	     movlw B'11111111'; load binary number onto W registry (all input)
+	     movlw B'00000111' ; load binary number onto W registry (0-2 input)
 	     movwf TRISE ; load W into TRISE
 	     
-	     movlw   B'00001110' ; RA0 analog input, all other digital
-	     movwf   ADCON1 ; move to special function A/D register
+	     movlw B'00001010' ; RA0 analog input, all other digital
+	     movwf ADCON1 ; move to special function A/D register
 	     
 	     bcf STATUS, RP0 ; Clear bit in STATUS register for bank 0
 	     return
-
 ; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ;
 ;  InitializeAD - initializes and sets up the A/D hardware.
@@ -230,5 +224,4 @@ isrService
              goto isrService ; error - - stay here
 ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
              end
-
 
