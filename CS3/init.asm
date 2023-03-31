@@ -45,8 +45,8 @@ ResetProgram ;turn off transistors, reset LEDs
 	    clrf    Temp                    ; zero the temporary register
 	    clrf    State                   ; zero the state
 	    clrf    SolStatus
-	    andlw  B'00000000'
-	    movwf SolStatus
+	    andlw   B'00000000'
+	    movwf   SolStatus
 waitGreenPress
 	    btfss   PORTC,7		        ; see if green button pressed
 	    goto    GreenPress		    ; green button is pressed - goto routine
@@ -58,6 +58,11 @@ GreenPress
 GreenRelease
 	    btfss   PORTC,7		        ; see if green button released
 	    goto    GreenRelease	    ; no - keep waiting
+            
+	    bcf     PORTD, 7
+	    andlw   B'00000000'
+	    movwf   SolStatus
+	    
 	    goto    ReadMode
 	    
 ReadMode
@@ -65,6 +70,17 @@ ReadMode
 	    andlw   B'00000111'             ; subtract upper bits
 	    movwf   State		    ; store mode in State
 	    movwf   PORTB                   ; move state to port B to display
+
+	    ;movf    State, W			; move state to W
+	    ;andlw   B'11111111'		    ; bitwise and 11111111 to w -- i think. should check this
+	    ;btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    ;goto    ModeFault
+	    
+	    movlw    B'00000000'
+	    bcf      STATUS,Z
+	    xorwf    State, 0	    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc    STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    goto     ModeFault
 
 	    movf    State, W			; move state to W
 	    andlw   B'11111110'		    ; bitwise and 11111111 to w -- i think. should check this
@@ -79,18 +95,13 @@ ReadMode
 	    movf    State, W			; move state to W
 	    andlw   B'11111100'		    ; bitwise and 11111111 to w -- i think. should check this
 	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
-	    goto	ModeThree
+	    goto    ModeThree
 
 	    movf    State, W			; move state to W
 	    andlw   B'11111011'		    ; bitwise and 11111111 to w -- i think. should check this
 	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
-	    goto	ModeFour
-
-	    movf    State, W			; move state to W
-	    andlw   B'11111111'		    ; bitwise and 11111111 to w -- i think. should check this
-	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
-	    goto    ModeFault
-
+	    goto    ModeFour
+	    
 	    movf    State, W			; move state to W
 	    andlw   B'11111010'		    ; bitwise and 11111111 to w -- i think. should check this
 	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
@@ -113,10 +124,14 @@ ModeOne
 
 
 waitModeOne
-;	movlw   B'00000001'	    ; move "4" to W register
-;	movwf   PORTB	            ; display mode 4 on LEDs
+	
+	    btfss    SolStatus, 0  ; <---- sol status is always 0, so this always runs
+	    bcf      PORTD, 2                       ; set W to 1
+	    btfsc    SolStatus, 0
+	    bsf      PORTD, 2                       ; set W to 1
+	    	    
 		btfss PORTC, 7
-		goto GreenPress             ; should make sure we turn off the main transistor here?
+		goto GreenPress             
 
 		btfss PORTC, 6
 		goto RedPress
@@ -126,26 +141,51 @@ waitModeOne
 RedPress
 		call SwitchDelay
 		btfsc PORTC, 6
+	        goto waitModeOne
+		
 		goto RedRelease
 
 RedRelease
 	    btfss   PORTC,6		        ; see if red button released
 	    goto    RedRelease	                ; no - keep waiting
 	    
+	    movlw    B'00000000'
+	    bcf      STATUS,Z
+	    xorwf    SolStatus, 0	    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc    STATUS, Z		    ; skip if clear (comparison). all bits should be set
+            bsf      PORTD, 7
+
+	    ;movf    SolStatus, W	     ; move state to W
+	    ;andlw   B'11111111'		    ; bitwise and 11111111 to w -- i think. should check this
+	    ;btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+	    ;goto    SolenoidEngaged          
 	    
-	    movf    SolStatus, W	     ; move state to W
-	    andlw   B'11111111'		    ; bitwise and 11111111 to w -- i think. should check this
-	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
-	    goto    SolenoidEngaged          
 	    
-	    movf    SolStatus, W	     ; move state to W
-	    andlw   B'11111110'		    ; bitwise and 11111111 to w -- i think. should check this
-	    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be setage the solenoid
-	    goto    SolenoidDisengaged
+	    movlw    B'00000001'
+	    bcf      STATUS,Z
+	    xorwf    SolStatus, 0	    ; bitwise and 11111111 to w -- i think. should check this
+	    btfsc    STATUS, Z		    ; skip if clear (comparison). all bits should be set
+            bcf      PORTD, 7
 	    
-	    comf    SolStatus, W
-	    xorlw   B'11111110'             ; subtract upper bits
+	    
+	    ;movf    SolStatus, W	     ; move state to W   -- check 2
+	    ;bcf     STATUS, Z
+	    ;andlw   B'11111110'		    ; bitwise and 11111111 to w -- i think. should check this
+	    ;btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be setage the solenoid
+	    ;goto    SolenoidDisengaged
+
+	    ;clrf    SolStatus   ;'00000000' '00000001'
+	    comf    SolStatus, W ;'11111111' '11111110'
+	    xorlw   B'11111110'  ;'00000001' '00000000'          ; subtract upper bits
+	    ;movlw    B'00000001'                        ; set W to 1
 	    movwf  SolStatus
+
+	    ;btfsc    PORTD, 6  ; --- check 3
+	    ;movlw    B'00000001'                        ; set W to 1
+	    ;btfss    PORTD, 6
+	    ;movlw    B'00000000'
+	    ;movwf    SolStatus
+	    
 	    goto    waitModeOne
 	    
 
@@ -160,8 +200,8 @@ ModeFour
 
 ModeFault
 	bsf     PORTB, 3
-	goto    SolenoidDisengaged
-	goto    waitGreenPress           ; not sure about this? idk where the black reset switch is tho 
+	;goto    SolenoidDisengaged
+	goto    isrService
 	    
 	    
 SwitchDelay 
@@ -175,11 +215,9 @@ delay
 	    
 ; Solenoid Engaged / Disengaged
 SolenoidEngaged
-     bsf     PORTB, 2    
      bsf    PORTD, 7		; turn on main transistor
      return
 SolenoidDisengaged
-     bcf     PORTB, 3    
      bcf    PORTD, 7
      return
 
@@ -204,7 +242,7 @@ initPort
 	    movlw   B'11111111'; load binary number onto W registry (all input)
 	    movwf   TRISC ; load W into TRISC
 	    
-	    movlw   B'00111100'; load binary number onto W registry (all input)
+	    movlw   B'00111000'; load binary number onto W registry (all input)
 	    movwf   TRISD ; load W into TRISD
 	    
 	    movlw   B'00000111'; load binary number onto W registry (all input)
@@ -270,5 +308,7 @@ isrService
 ; ** faults: if fault triggered, turn the fault LED on, then wait for the black reset switch
 
 ; ** if reset, jump to init
+
+
 
 
