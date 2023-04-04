@@ -1,12 +1,46 @@
 	list p=16F747
 	title "On / Off Control"
+
+;***********************************************************
+; Case Study #3 - On Off Control Program
+;
+; On this microcomputer board, Port B is connected to 4 LED's which are used to
+; display the mode of the program operation and any errors (indicator LEDs). 
+; Upon reset, the program jumps to an initialization routine (init label). 
+; The program then waits for the green button (pushbutton connected to 
+; Port C pin 0) to be pressed. The indicator LEDs will indicate 0h. 
+; The octal switch to Port E is used to indicate the mode.
+; It is read when the green button is pressed and released and the
+; mode of operation will be started. The indicator LEDs will 
+; indicate the mode. All modes other than 1-4 inclusive will indicate a fault
+; by the LED connected to Port B pin 3.
+;
+; If there is no fault after the previous operation has completed, the mode bits
+; are read when the green button is pressed and that mode of operation is
+; engaged. For correct modes, the fault LED is off. After any fault, pressing
+; the green button will not cause any bits to be read. The processor must be 
+; reset with the black reset switch. The state of the program is stored in State.
+; The Solenoid transistors and "Ready" LED (used in Mode 3) are connected to
+; Port D (pins 6, 7 and 2 respectively).
+;
+; This program switches between four modes which mimic common use case scenarios
+; of on/off control. 
+;
+; Mode 1 is a basic test to ensure the solenoid functions and its associated
+; sensors. Mode 2 mimics a toaster oven application with basic timing control.
+; It uses the control precision potentiometer (Port A pin 0) to set a time and 
+; counts down. Mode 3 mimics an air conditioning application with basic 
+; feedback control. Mode 4 mimics a sump pump application with feedback, a 
+; backup circuit, fault detenction, and fault recovery.
+;
+;***********************************************************
 	
     #include <p16F747.INC>
 	
     __config _CONFIG1, _FOSC_HS & _CP_OFF & _DEBUG_OFF & _VBOR_2_0 & _BOREN_0 & _MCLR_ON & _PWRTE_ON & _WDT_OFF
     __config _CONFIG2, _BORSEN_0 & _IESO_OFF & _FCMEN_OFF
     
-    ; Variable Declarations
+;       Variable Declarations
 Timer2	    equ	    20h		    ; timer storage variable
 Timer1	    equ	    21h		    ; timer storage variable
 Timer0	    equ	    22h		    ; timer storage variable
@@ -16,9 +50,7 @@ Count	    equ     26h		    ; the counter
 State	    equ     25h             ; the program state register
 SolStatus   equ     27h             ; status of the solenoid (engaged/disengaged)
 TimerState  equ	    13h		    ; Timer	    
-Green	    equ     18h		    ; the mode switching button
 Control	    equ     16h		    ; value for red button (control active/inactive)
-Mode	    equ     14h		    ; the mode  
 	    
 	    org	    00h		    ; interrupt vector
 	    goto    SwitchCheck	    ; jump to interrupt service routine (dummy)
@@ -29,9 +61,10 @@ Mode	    equ     14h		    ; the mode
 	    org	    15h		    ; beginning of storage program
 SwitchCheck
 	call    initPort	    ; initialize ports
-; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+; 
 ;-------------------Mode Classifying / Initialization---------------------
-ResetProgram ;turn off transistors, reset LEDs
+;
+ResetProgram                        ; turn off transistors, reset LEDs
     clrf    Count		    ; zero the counter
     clrf    Temp                    ; zero the temporary register
     clrf    State                   ; zero the state
@@ -70,45 +103,45 @@ ReadMode
 
     movf    State, W		    ; move state value to W
     andlw   B'11111110'		    ; bitwise and mode 1 complement to W
-    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+    btfsc   STATUS, Z		    ; skip if clear (comparison)
     goto    ModeOne
 
     movf    State, W		    ; move state to W
     andlw   B'11111101'		    ; bitwise and mode 2 complement to W
-    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+    btfsc   STATUS, Z		    ; skip if clear (comparison)
     goto    ModeTwo
 
     movf    State, W		    ; move state to W
     andlw   B'11111100'		    ; bitwise and mode 3 complement to W
-    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+    btfsc   STATUS, Z		    ; skip if clear (comparison)
     goto    ModeThree
 
     movf    State, W		    ; move state to W
     andlw   B'11111011'		    ; bitwise and mode 4 complement to W
-    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+    btfsc   STATUS, Z		    ; skip if clear (comparison)
     goto    ModeFour
 
     movf    State, W		    ; move state to W
     andlw   B'11111010'		    ; bitwise and mode 5 complement to W
-    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+    btfsc   STATUS, Z		    ; skip if clear (comparison)
     goto    ErrorDetected
 
     movf    State, W		    ; move state to W
     andlw   B'11111001'		    ; bitwise and mode 6 complement to W
-    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+    btfsc   STATUS, Z		    ; skip if clear (comparison)
     goto    ErrorDetected
 
     movf    State, W		    ; move state to W
     andlw   B'11111000'		    ; bitwise and mode 7 complement to W
-    btfsc   STATUS, Z		    ; skip if clear (comparison). all bits should be set
+    btfsc   STATUS, Z		    ; skip if clear (comparison)
     goto    ErrorDetected
 
     goto    waitGreenPress          ; wait for change of mode
-; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-; 
-; Main Code
+      
+;       Main Code
 ; 
 ;---------------------------- Mode 1 --------------------------------------
+;
 ModeOne   
     btfss    SolStatus, 0           ; SolStatus is 0 if on
     bcf      PORTD, 2               ; turn off solenoid; skips if off
@@ -125,16 +158,17 @@ CheckRedStatus
     movlw    B'00000001'            ; Set W to 1
     bcf      STATUS,Z               ; clear Z register for XOR operation
     xorwf    SolStatus, 0	    ; XOR SolStatus w/ W for equivalency
-    btfsc    STATUS, Z		    ; skip if clear (comparison). all bits should be set
+    btfsc    STATUS, Z		    ; skip if clear (comparison)
     bcf      PORTD, 7               ; turn off solenoid if SolStatus indicates on
 
     comf    SolStatus, W            ; complement SolStatus and store in W
     xorlw   B'11111110'             ; XOR the complement of 1 with W, store in W
-    movwf   SolStatus               ; set SolStatus equal to result (alternated value)
+    movwf   SolStatus               ; set SolStatus equal to result (alternated)
     
     goto    ModeOne                 ; stay in Mode 1
-; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;
 ;---------------------------- Mode 2 --------------------------------------
+;
 ModeTwo
     movlw   B'00000010'		    ; moving "2" to W register
     movwf   PORTB		    ; displaying mode 2 on LEDs
@@ -150,13 +184,13 @@ CheckError
 ADCountDown
     btfss   PORTC, 6		    ; check if red button pressed
     call    GreenCheckRedCheck	    ; if pressed, need to restart
-    call    timeLoopQuart	    ; AD value not zero, continue 1/4 second time program
+    call    timeLoopQuart	    ; AD value not 0, continue 1/4 second time program
     decfsz  ADvalue		    ; count down AD value from potentiometer
     goto    ADCountDown		    ; AD value not zero, keep going
     goto    Restart		    ; AD value has reached zero, start over
 ; 
-; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ;---------------------------- Mode 3 --------------------------------------
+;
 ModeThree
     call    waitPress		    ; red button pressed == activate control
     movlw   B'00000100'             ; turn on 'ready' LED - set value in W
@@ -189,17 +223,18 @@ Engage
     goto    Mode3RedPress           ; alternate control btwn active/inactive 
     goto    AtoD                    ; restart loop to keep reading pot val
 ;
-; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ;---------------------------- Mode 4 --------------------------------------
+;
 ModeFour
     movlw   B'00000100'	            ; move "4" to W register
     movwf   PORTB	            ; display mode 4 on LEDs
     call    waitPress               ; wait to exit mode or engage w/ solenoid
-; -------------Read A/D for time-----------
+; Read A/D for time
     call    AtoDInit                ; initialize AD
 ; AD Checking Error
     call    ZeroError               ; check if control pot is reading 0
-; ------------ Turn on Main Transistor & reset timer ----------
+
+; Turn on Main Transistor & reset timer 
 Restart4
     bsf	    PORTD,7	            ; Turn on main transistor
     clrf    TimerState              ; reset TimerState
@@ -211,10 +246,11 @@ checkElapsed
     movlw   D'10'                   ; move 10 decimal to W
     bcf	    STATUS,Z                ; clear Z register for operations
     subwf   TimerState, W           ; Subtracts the current TimerState by 10
-    btfsc   STATUS,Z	            ; If, TimerState - 10 < 0, skip next line [proceed to error when greater than 10]
+    btfsc   STATUS,Z	            ; If, TimerState - 10 < 0, skip next line
     goto    ErrorDetected           ; 10s has elapsed, go to error
     goto    CheckSensor	            ; Keep checking sensor until 10s has elapsed
-;------------------- 'Continue 4' ---------------------------
+;
+; 'Continue 4'
 Continue4
     bsf	    PORTD,6	            ; Turn on Reduced Transistor
     call    timeLoopOne	            ; Wait a little
@@ -245,9 +281,10 @@ checkElapsed2
     btfsc   STATUS,Z                ; If, TimerState - 10 < 0, skip next line 
     goto    ErrorDetected           ; 10s has elapsed, go to error
     goto    CheckOff4               ; Check if sensor is low
+
 ;
-; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-; ---------------- Timer for 1/4 of potentiometer time -----------------
+;       Timer for 1/4 of potentiometer time 
+;
 decLoop
     call    timeLoopQuart
     btfss   PORTC,0	            ; sensor check
@@ -264,21 +301,25 @@ checkRestart
     goto    Restart4	            ; Restart4
 ;
 ; &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-; Universal Functions
+;
+    
+;
+;---------------------------- Universal Functions;----------------------------
+; 
 waitPress
     btfss   PORTC, 7	            ; check for green press
     goto    GreenPress	            ; if green button is pressed, go to GreenPress
-    btfss   PORTC, 6	            ; if not, check for red press (procesed to read A/D time)
+    btfss   PORTC, 6	            ; if not, check for red press 
     goto    RedPress	            ; if red button pressed, go to RedPress
-    goto    waitPress	            ; repeat waitPress if neither buttons have been pressed
+    goto    waitPress	            ; repeat waitPress if neither buttons pressed
     
 RedPress
     call    SwitchDelay	            ; let switch debounce
-    btfsc   PORTC, 6	            ; check if red still pressed (low active) [skip next line if true]
-    goto    waitPress	            ; button was not properly pressed, go back to waitPress
+    btfsc   PORTC, 6	            ; check if red still pressed (low active)
+    goto    waitPress	            ; button not properly pressed, go back
     
 RedRelease
-    btfss   PORTC, 6	            ; check if red button is released [skip next line if true]
+    btfss   PORTC, 6	            ; check if red button is released 
     goto    RedRelease	            ; repeat check
     return
 
@@ -286,7 +327,7 @@ RedRelease
 Mode3RedPress
     call    RedPress                ; confirm RedPress
     btfsc   PORTD, 2                ; check whether control active or inactive
-    goto    ClearLEDandSol          ; if control inactive, turn off solenoid and 'ready' LED
+    goto    ClearLEDandSol          ; if inactive, turn off solenoid and 'ready' LED
     return
 
 ; AD Conversion
@@ -303,7 +344,6 @@ waitLoop
     movf    ADRESH, W		    ; get A/D value
     movwf   ADvalue		    ; move AD value to AtoD1 from W register
     return
-;
 ; AD Checking Error
 ZeroError   
     movlw   B'00000000'		    ; moving "0" to the W register
@@ -312,8 +352,10 @@ ZeroError
     btfsc   STATUS, Z		    ; check if status, z is 1 or zero
     goto    ErrorDetected           ; go to error detect if status, z is 0
     return
+    
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ;
-; Port/ AD Initialization Subroutine
+;       Port/AD Initialization Subroutine
 initPort    
     clrf    PORTB	            ; clearing port B output latches (LEDs)
     clrf    PORTC		    ; clearing port C output latches (green button)
@@ -355,7 +397,6 @@ delay2
      decfsz  Temp, F		    ; delay loop
      goto    delay2
      return
-;
 ; Switch Debounce
 SwitchDelay
      movlw   D'20'		    ; load Temp with decimal 20
@@ -364,9 +405,14 @@ delay1
      decfsz  Temp, F		    ; 60 usec delay loop
      goto    delay1		    ; loop until count equals zero
      return			    ; return to calling routine
+; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ;
-; Timers
-; ------------- Setup 1/4s Timer ---------------  
+     
+;
+;---------------------------- Timers ----------------------------
+;
+     
+; Setup 1/4s Timer  
 timeLoopQuart
     movlw   02h
     movwf   Timer2
@@ -383,7 +429,7 @@ timeLoopDelayQuart
     decfsz  Timer2,F
     goto    timeLoopDelayQuart
     return
-; ------------- Setup 1s Timer --------------------
+; Setup 1s Timer 
 Timer
     incf TimerState, F
     goto timeLoopOne
@@ -405,8 +451,8 @@ timeLoopOneDelay
     goto    timeLoopOneDelay
     return
 ;
-; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-; Solenoid Engaged / Disengaged
+;------------------ Solenoid Engage/Disengage -----------------------
+;
 SolenoidEngaged
      bsf    PORTD, 7		    ; turn on main transistor
      return
@@ -414,10 +460,8 @@ SolenoidDisengaged		    ; turn off main transistor
      bcf    PORTD, 7
      return
 ;
-; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;---------------------------- ERROR  -----------------------
 ;
-; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-; Error
 ErrorDetected
      clrf   PORTD		    ; disengage solenoid
 ErrorFlash			    ; flash the error LED
@@ -426,8 +470,7 @@ ErrorFlash			    ; flash the error LED
      bcf    PORTB, 3		    ; clear port B pin 3 to "0" to clear error LED
      call   timeLoopOne		    ; 1s Timer
      goto   ErrorFlash		    ; go through error flash again until reset
-;
-; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+     
 ; ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ; 
 ;   Note: This is a dummy interrupt service routine. It is  good programming 
