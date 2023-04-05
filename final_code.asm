@@ -31,7 +31,7 @@
 ; It uses the control precision potentiometer (Port A pin 0) to set a time and 
 ; counts down. Mode 3 mimics an air conditioning application with basic 
 ; feedback control. Mode 4 mimics a sump pump application with feedback, a 
-; backup circuit, fault detenction, and fault recovery.
+; backup circuit, fault detection, and fault recovery.
 ;
 ;***********************************************************
 	
